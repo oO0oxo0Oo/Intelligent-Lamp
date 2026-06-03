@@ -1,0 +1,64 @@
+from flask import Blueprint, current_app, request
+
+from backend.services import camera_store, telemetry_service
+from backend.utils.response import error, ok
+
+
+device_api = Blueprint("device_api", __name__)
+
+
+def _device_auth_failed():
+    token = request.headers.get("X-Device-Token")
+    return token != current_app.config["DEVICE_TOKEN"]
+
+
+@device_api.before_request
+def verify_device_token():
+    if _device_auth_failed():
+        return error("Unauthorized device token", 401)
+    return None
+
+
+@device_api.post("/telemetry")
+def receive_telemetry():
+    payload = request.get_json(silent=True) or {}
+    if not payload.get("device_id"):
+        return error("device_id is required")
+    telemetry_service.save_telemetry(payload)
+    return ok({"message": "telemetry stored"}, 201)
+
+
+@device_api.post("/events")
+def receive_event():
+    payload = request.get_json(silent=True) or {}
+    if not payload.get("device_id") or not payload.get("event_type"):
+        return error("device_id and event_type are required")
+    telemetry_service.save_event(payload)
+    return ok({"message": "event stored"}, 201)
+
+
+@device_api.post("/heartbeat")
+def receive_heartbeat():
+    payload = request.get_json(silent=True) or {}
+    if not payload.get("device_id"):
+        return error("device_id is required")
+    telemetry_service.save_heartbeat(payload)
+    return ok({"message": "heartbeat stored"}, 201)
+
+
+@device_api.post("/camera/frame")
+def receive_camera_frame():
+    device_id = request.headers.get("X-Device-Id") or request.args.get("device_id") or "unknown"
+    timestamp = request.args.get("timestamp", type=int)
+    frame = request.get_data()
+    if not frame:
+        return error("empty frame body")
+    camera_store.update_frame(device_id, frame, timestamp)
+    return ok({"message": "frame stored"})
+
+
+@device_api.get("/config")
+def get_runtime_config():
+    from backend.services.db import get_settings
+
+    return ok({"settings": get_settings()})

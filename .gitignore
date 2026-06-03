@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+
+# Local ESP32 secrets
+device/secrets.json
+
+# Local backend environment and database
+backend/.env
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary docs move state
+docs/
