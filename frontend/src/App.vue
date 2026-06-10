@@ -8,7 +8,6 @@ import LampControlPanel from '@/components/LampControlPanel.vue'
 import MonitorPanel from '@/components/MonitorPanel.vue'
 import SettingsPanel from '@/components/SettingsPanel.vue'
 import StudySummaryPanel from '@/components/StudySummaryPanel.vue'
-import { USE_MOCK } from '@/api/sensorService'
 import type { AppTab } from '@/types/navigation'
 
 const activeTab = ref<AppTab>('monitor')
@@ -21,8 +20,7 @@ const activeTab = ref<AppTab>('monitor')
         <p class="eyebrow">StudyPilot Parent Console</p>
         <h1>StudyPilot 智能学习台灯家长端</h1>
         <p class="hero-card__desc">
-          入座监测、学习识别、异常提醒、离桌判定与数据复盘一体化管理平台。当前数据源：
-          {{ USE_MOCK ? '本地 Mock（演示模式）' : '后端接口' }}。
+          入座监测、学习识别、异常提醒、离桌判定与数据复盘一体化管理平台。
         </p>
       </div>
     </section>

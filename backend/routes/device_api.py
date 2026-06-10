@@ -1,6 +1,7 @@
 from flask import Blueprint, current_app, request
 
-from backend.services import camera_store, telemetry_service
+from backend.services import camera_store, lamp_service, telemetry_service
+from backend.services.db import get_threshold_settings, get_settings
 from backend.utils.response import error, ok
 
 
@@ -33,8 +34,18 @@ def receive_event():
     payload = request.get_json(silent=True) or {}
     if not payload.get("device_id") or not payload.get("event_type"):
         return error("device_id and event_type are required")
-    telemetry_service.save_event(payload)
-    return ok({"message": "event stored"}, 201)
+    event_id = telemetry_service.save_event(payload)
+    return ok({"message": "event stored", "event_id": event_id}, 201)
+
+
+@device_api.post("/events/<int:event_id>/snapshot")
+def upload_event_snapshot(event_id):
+    jpeg_bytes = request.get_data()
+    if not jpeg_bytes:
+        return error("empty snapshot body")
+    if not telemetry_service.attach_event_snapshot(event_id, jpeg_bytes):
+        return error("failed to attach snapshot", 404)
+    return ok({"message": "snapshot stored"}, 201)
 
 
 @device_api.post("/heartbeat")
@@ -59,6 +70,9 @@ def receive_camera_frame():
 
 @device_api.get("/config")
 def get_runtime_config():
-    from backend.services.db import get_settings
-
-    return ok({"settings": get_settings()})
+    return ok(
+        {
+            "settings": get_threshold_settings(get_settings()),
+            "lamp_control": lamp_service.get_lamp_control(),
+        }
+    )

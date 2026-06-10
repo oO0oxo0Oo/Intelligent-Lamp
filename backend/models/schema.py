@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS events (
     distance_level TEXT,
     study_state TEXT,
     extra_json TEXT,
+    snapshot_path TEXT,
+    has_snapshot INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

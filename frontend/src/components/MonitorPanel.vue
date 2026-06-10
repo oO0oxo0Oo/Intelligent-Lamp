@@ -5,11 +5,10 @@ import SensorCard from '@/components/SensorCard.vue'
 import { useSensorDashboard } from '@/composables/useSensorDashboard'
 import { formatEventTime, getEventTypeLabel } from '@/api/statusMapper'
 
-const { dashboard, loading, error, dataSource } = useSensorDashboard()
+const { dashboard, loading, error } = useSensorDashboard()
 
 const statusText = computed(() => (dashboard.value?.lamp.online ? '设备在线' : '设备离线'))
 const updatedAtText = computed(() => dashboard.value?.lamp.updatedAt ?? '--')
-const dataSourceText = computed(() => (dataSource.value === 'mock' ? 'Mock 轮询' : '接口轮询'))
 </script>
 
 <template>
@@ -97,7 +96,7 @@ const dataSourceText = computed(() => (dataSource.value === 'mock' ? 'Mock 轮�
               <p class="eyebrow">Realtime</p>
               <h2>传感器实时概览</h2>
             </div>
-            <button type="button" disabled>{{ dataSourceText }} · 2s</button>
+            <button type="button" disabled>接口轮询 · 2s</button>
           </div>
 
           <div class="sensor-grid">

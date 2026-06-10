@@ -1,8 +1,10 @@
 import json
 import time
 
-from backend.services import summary_service
-from backend.services.db import execute, fetch_all, fetch_one, get_settings
+from backend.services import lamp_service, snapshot_store, summary_service
+from backend.services.db import execute, fetch_all, fetch_one, get_settings, get_threshold_settings
+
+SNAPSHOT_EVENT_TYPES = frozenset({"distance_too_close", "presence_away"})
 
 
 def save_telemetry(payload):
@@ -38,7 +40,7 @@ def save_telemetry(payload):
 
 
 def save_event(payload):
-    execute(
+    event_id = execute(
         """
         INSERT INTO events (
             device_id, timestamp, event_type, level, message, presence_state, distance_level, study_state, extra_json
@@ -57,6 +59,26 @@ def save_event(payload):
         ),
     )
     sync_session_from_event(payload)
+    return event_id
+
+
+def attach_event_snapshot(event_id, jpeg_bytes):
+    event = fetch_one("SELECT * FROM events WHERE id = ?", (event_id,))
+    if event is None:
+        return False
+    if event.get("event_type") not in SNAPSHOT_EVENT_TYPES:
+        return False
+
+    snapshot_path = snapshot_store.save_event_snapshot(event_id, jpeg_bytes)
+    execute(
+        """
+        UPDATE events
+        SET snapshot_path = ?, has_snapshot = 1
+        WHERE id = ?
+        """,
+        (snapshot_path, event_id),
+    )
+    return True
 
 
 def save_heartbeat(payload):
@@ -180,6 +202,21 @@ def close_active_session(device_id, ended_at, duration_seconds=None):
     return fetch_one("SELECT * FROM study_sessions WHERE id = ?", (session["id"],))
 
 
+def _serialize_event(row):
+    if row is None:
+        return None
+
+    event = dict(row)
+    event["extra_json"] = json.loads(event["extra_json"]) if event.get("extra_json") else {}
+    if event.get("has_snapshot") and event.get("event_type") in SNAPSHOT_EVENT_TYPES:
+        event["snapshot_url"] = f"/api/status/events/{event['id']}/snapshot.jpg"
+    else:
+        event["snapshot_url"] = None
+    event.pop("snapshot_path", None)
+    event.pop("has_snapshot", None)
+    return event
+
+
 def get_current_status():
     latest_telemetry = fetch_one(
         """
@@ -203,8 +240,9 @@ def get_current_status():
     return {
         "telemetry": latest_telemetry,
         "heartbeat": latest_heartbeat,
-        "latest_event": latest_event,
-        "settings": get_settings(),
+        "latest_event": _serialize_event(latest_event),
+        "settings": get_threshold_settings(get_settings()),
+        "lamp_control": lamp_service.get_lamp_control(),
     }
 
 
@@ -220,6 +258,11 @@ def get_telemetry_history(limit=120):
     return list(reversed(rows))
 
 
+def get_events_total():
+    total_row = fetch_one("SELECT COUNT(*) AS total FROM events")
+    return int(total_row["total"]) if total_row else 0
+
+
 def get_events(limit=50):
     rows = fetch_all(
         """
@@ -227,9 +270,29 @@ def get_events(limit=50):
         """,
         (limit,),
     )
-    for row in rows:
-        row["extra_json"] = json.loads(row["extra_json"]) if row.get("extra_json") else {}
-    return rows
+    return [_serialize_event(row) for row in rows]
+
+
+def get_events_page(page=1, page_size=6):
+    page = max(1, int(page))
+    page_size = max(1, int(page_size))
+    offset = (page - 1) * page_size
+
+    total_row = fetch_one("SELECT COUNT(*) AS total FROM events")
+    total = int(total_row["total"]) if total_row else 0
+    rows = fetch_all(
+        """
+        SELECT * FROM events ORDER BY id DESC LIMIT ? OFFSET ?
+        """,
+        (page_size, offset),
+    )
+
+    return {
+        "items": [_serialize_event(row) for row in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 def get_current_session():

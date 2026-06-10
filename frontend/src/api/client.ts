@@ -29,8 +29,12 @@ export async function fetchCurrentStatus(): Promise<CurrentStatusResponse> {
   return parseJson(await fetch(`${API_BASE}/api/status/current`))
 }
 
-export async function fetchEvents(limit = 50): Promise<EventsResponse> {
-  return parseJson(await fetch(`${API_BASE}/api/status/events?limit=${limit}`))
+export async function fetchEvents(page = 1, pageSize = 50): Promise<EventsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  })
+  return parseJson(await fetch(`${API_BASE}/api/status/events?${params.toString()}`))
 }
 
 export async function fetchHistory(limit = 120): Promise<HistoryResponse> {
@@ -63,7 +67,9 @@ export async function saveSettings(settings: LampSettings): Promise<SettingsResp
   )
 }
 
-export async function saveLampControl(control: LampControlState): Promise<{ ok: boolean }> {
+export async function saveLampControl(
+  control: LampControlState,
+): Promise<{ ok: boolean; lamp_control?: LampControlState }> {
   return parseJson(
     await fetch(`${API_BASE}/api/lamp/control`, {
       method: 'PUT',
